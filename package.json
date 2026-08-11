@@ -1,7 +1,7 @@
 {
   "name": "currencies-mepto",
   "version": "1.0.0-mepto.1",
-  "description": "Currencies.js extension for Shopify — Mepto-integrated, jQuery-free. Efficient drop-in for jquery.currencies.js.",
+  "description": "Currencies.js extension for Shopify \u2014 Mepto-integrated, jQuery-free. Efficient drop-in for jquery.currencies.js.",
   "keywords": [
     "shopify",
     "currency",
@@ -21,6 +21,8 @@
   "files": [
     "dist",
     "src",
+    "jquery.currencies.js",
+    "jquery.currencies.min.js",
     "README.md"
   ],
   "license": "MIT",
@@ -31,7 +33,7 @@
     "clean": "node -e \"fs.rmSync('dist',{recursive:true,force:true})\"",
     "build": "npm run clean && vite build && npm run build:min && npm run build:banner",
     "build:min": "vite build --config vite.min.config.mjs",
-    "build:banner": "node -e \"import fs from 'fs';const pkg=JSON.parse(fs.readFileSync('./package.json','utf8'));const b='/*! Currencies Mepto v'+pkg.version+' — Mepto-integrated, jQuery-free */\\n';['dist/currencies.esm.min.js','dist/currencies.pkgd.min.js'].forEach(f=>{let c=fs.readFileSync(f,'utf8');if(!c.startsWith('/*!')){fs.writeFileSync(f,b+c);console.log('banner',f)}})\"",
+    "build:banner": "node -e \"import fs from 'fs';const pkg=JSON.parse(fs.readFileSync('./package.json','utf8'));const b='/*! Currencies Mepto v'+pkg.version+' \u2014 Mepto-integrated, jQuery-free */\\n';['dist/currencies.esm.min.js','dist/currencies.pkgd.min.js'].forEach(f=>{let c=fs.readFileSync(f,'utf8');if(!c.startsWith('/*!')){fs.writeFileSync(f,b+c);console.log('banner',f)}})\"",
     "dev": "vite build --watch",
     "lint": "npx eslint src --ext .js"
   },
