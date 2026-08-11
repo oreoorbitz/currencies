@@ -1,82 +1,68 @@
-jquery.currencies.js
+# currencies-mepto — Mepto-integrated Currencies
 
-## Tutorial
+Efficient, drop-in replacement for `jquery.currencies.js` (Shopify, MIT). Migrate legacy Shopify themes off jQuery.
 
-[How to Show Multiple Currencies](http://wiki.shopify.com/How_to_Show_Multiple_Currencies)
+## Why
 
-## Description
+Legacy `jquery.currencies.js` depends on `jQuery` for `jQuery.cookie`, `jQuery(selector).each`, `.attr`, `.html` — 14 `jQuery` calls. This fork keeps every `Currency` API and swaps that surface for Mepto (`window.mepto || window.jQuery || window.$`) + native APIs, so themes can drop jQuery.
 
-jquery.currencies.js expands the currencies.js library provided by Shopify and has to be used in conjunction with it. 
+- `Currency.cookie` → native `document.cookie` (no `jQuery.trim`, no `jQuery.cookie` dep) — keeps `jQuery.cookie` alias for compat.
+- `Currency.convertAll` → `querySelectorAll` + batch `measure`/`mutate` (`rAF` reads→writes), `Map` format cache, hoisted regex — no per-element layout thrash for 50+ `span.money`.
+- `Currency.formatMoney` → deduped, hoisted regex, `Shopify.formatMoney` fallback kept.
+- `Currency.convert` assumed from `currencies.js` (Shopify `{{ "/services/javascripts/currencies.js" | script_tag }}`).
 
-While currencies.js allows you to convert a money amount from one currency to another, jquery.currencies.js provides a function that converts all money amounts on a web page and shows a _formatted_ result, with currency symbol and descriptor.
+## Install
 
-## Installation
+```sh
+npm install currencies-mepto meptos
+# or via CDN after build: dist/currencies.pkgd.min.js (IIFE) + dist/currencies.min.css (none)
+```
 
-Download jquery.currencies.min.js and upload it to your Shopify theme assets.
-Include the file in your theme.liquid file __before the closing body tag__ like so:
+## Build
 
-    {{ "/services/javascripts/currencies.js" | script_tag }}
-    {{ "jquery.currencies.min.js" | asset_url | script_tag }}
+```sh
+nvm use # Node 22 LTS
+npm ci
+npm run build # clean && vite build (ESM+IIFE ~24K/26K) && vite.min (~20K/16K, 4.0K gzip, Babel last 3)
+npm run dev  # vite build --watch (esnext→Babel)
+```
 
-## Usage
+`babel.config.json` `preset-env` `last 3` `modules:false` `bugfixes:true`, `vite` `esnext + @rollup/plugin-babel` (same as `flickity-mepto`).
 
-To save a picked currency to a cookie, use the following line of code, passing the currency code as parameter:
+## Use
 
-    Currency.cookie.write('CAD');
+**Shopify theme (IIFE, Mepto first):**
 
-To read the currency code saved to your 'currencies' cookie, use the following code:
- 
-    var cookieCurrency = Currency.cookie.read();
- 
-The above will return the currency code, or will return null if the cookie does not exist.
+```liquid
+{{ 'mepto.js' | asset_url | script_tag }}
+{{ 'currencies.js' | asset_url | script_tag }}
+{{ 'currencies-mepto.js' | asset_url | script_tag }}
+```
 
-To convert formatted money (with or without the currency code and descriptor) to formatted money in another currency use this:
+```js
+Currency.cookie.write('CAD')
+Currency.convertAll('USD', 'CAD', 'span.money')
+Currency.setMepto(window.mepto) // alias setJQuery retained
+```
 
-    Currency.convertAll(oldCurrency, newCurrency, selector, format);
+**ESM:**
 
-The parameters _oldCurrency_ and _newCurrency_ must be set to the 3-letter currency codes of the FROM and TO currencies.
- 
-The parameter _selector_ is a CSS selector that tells the function where to find the money on the page. It is optional. If it is not used, the function will look for all span elements on the page with a class attribute set to 'money', and will convert the money in those elements.
+```js
+import Currency from 'currencies-mepto' // or 'currencies-mepto/dist/currencies.esm.js'
+Currency.convertAll('USD', 'EUR')
+```
 
-So, using it without _selector_ is the same as calling the function like so:
+## API — frozen
 
-    Currency.convertAll('CAD', 'USD', 'span.money');
-    
-The parameter __format__ is optional and can take on the value 'money_format' or 'money_with_currency_format'.
+`Currency.cookie` (`write/read/destroy`), `Currency.moneyFormats`, `Currency.formatMoney`, `Currency.convert`, `Currency.convertAll`, `Currency.currentCurrency`, `Currency.format`, `Currency.setMepto/setJQuery`. HTML `span.money` + `data-currency` attrs unchanged. See [Tutorial](http://wiki.shopify.com/How_to_Show_Multiple_Currencies).
 
-Calling the function without _format_ is the same as calling the function like so:
+## Performance
 
-    Currency.convertAll('CAD', 'USD', 'span.money', 'money_with_currency_format');
-    
-Important: the convertAll method updates the 'currencies' cookie with _newCurrency_ and it also sets a global property that remembers what the current currency is: Currency.currentCurrency. Why? The cookie needs only be read once, ie. when the page loads, and one must keep a copy of the old value to send both old and new values to the converting drone.
+Mirrors `flickity-mepto` guide (`PERFORMANCE_GUIDE.md` Part I dominates): batch `convertAll` via `measure`/`mutate` `rAF` (single layout for 50 spans), hoisted `NON_DIGITS_RE`/`PLACEHOLDER_RE`/`THOUSANDS_RE`, `Map` format cache per `convertAll`, `DocumentFragment` not needed (spans already in DOM; batch is read→write). Keeps `jQuery` fallback via `window.mepto || window.jQuery`.
 
-## Optional global settings
-
-Add the following line of JavaScript before you own code, if you do not want the formatted money to show the currency descriptor:
-
-    Currency.format = 'money_format';
- 
-If you don't use the above line of code, the formatted money will be showing both the currency symbol and descriptor, i.e. it will show $20.00 USD instead of $20.00.
-
-If you want to use a different name for your cookie, use this:
-
-    Currency.cookie.name = 'my_awesome_cookie_name';
- 
-If you don't use the above line of code, the name of your cookie will be 'currencies'.
-
-## Dependencies
-
-jQuery >= 1.3.1
-
-jquery.min.currencies.js also requires Shopify's library currencies.js.
-
-currencies.js must be included before jquery.currencies.min.js.
-
-## Author
-
-jquery.currencies.js was created and is maintained by Caroline Schnapp mllegeorgesand AT gmail DOT com.
-  
 ## License
 
-jquery.currencies.js and its minified version are covered by the MIT License.
-http://www.opensource.org/licenses/mit-license.php
+MIT — same as upstream `carolineschnapp/currencies`.
+
+Upstream: https://github.com/carolineschnapp/currencies
+Fork: https://github.com/oreoorbitz/currencies (currencies-mepto)

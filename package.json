@@ -1,28 +1,66 @@
 {
-  "name": "jquery.currencies.js",
-  "version": "1.0.0",
-  "title": "Currencies.js extension for Shopify",
-  "description": "jquery.currencies.js expands the currencies.js library provided by Shopify and has to be used in conjunction with it.",
+  "name": "currencies-mepto",
+  "version": "1.0.0-mepto.1",
+  "description": "Currencies.js extension for Shopify — Mepto-integrated, jQuery-free. Efficient drop-in for jquery.currencies.js.",
   "keywords": [
-    "ecosystem:jquery",
-    "jquery-plugin",
     "shopify",
-    "currency"
+    "currency",
+    "currencies",
+    "mepto",
+    "jquery-free"
   ],
+  "type": "module",
+  "main": "dist/currencies.pkgd.js",
+  "module": "dist/currencies.esm.js",
+  "exports": {
+    ".": {
+      "import": "./dist/currencies.esm.js",
+      "require": "./dist/currencies.pkgd.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "license": "MIT",
+  "browserslist": [
+    "last 3 versions"
+  ],
+  "scripts": {
+    "clean": "node -e \"fs.rmSync('dist',{recursive:true,force:true})\"",
+    "build": "npm run clean && vite build && npm run build:min && npm run build:banner",
+    "build:min": "vite build --config vite.min.config.mjs",
+    "build:banner": "node -e \"import fs from 'fs';const pkg=JSON.parse(fs.readFileSync('./package.json','utf8'));const b='/*! Currencies Mepto v'+pkg.version+' — Mepto-integrated, jQuery-free */\\n';['dist/currencies.esm.min.js','dist/currencies.pkgd.min.js'].forEach(f=>{let c=fs.readFileSync(f,'utf8');if(!c.startsWith('/*!')){fs.writeFileSync(f,b+c);console.log('banner',f)}})\"",
+    "dev": "vite build --watch",
+    "lint": "npx eslint src --ext .js"
+  },
   "author": {
-    "name": "Caroline Schnapp",
+    "name": "Caroline Schnapp (upstream) + oreoorbitz/currencies-mepto (mepto port)",
     "email": "mllegeorgesand@gmail.com",
     "url": "https://github.com/carolineschnapp"
   },
-  "license": "MIT",
   "bugs": {
-    "url": "https://github.com/carolineschnapp/currencies/issues"
+    "url": "https://github.com/oreoorbitz/currencies/issues"
   },
-  "main": "jquery.currencies.js",
-  "homepage": "https://github.com/carolineschnapp/currencies/",
-  "devDependencies": {},
   "repository": {
     "type": "git",
-    "url": "https://github.com/carolineschnapp/currencies.git"
+    "url": "git+https://github.com/oreoorbitz/currencies.git"
+  },
+  "homepage": "https://github.com/oreoorbitz/currencies#readme",
+  "peerDependencies": {
+    "meptos": ">=2.0.0"
+  },
+  "devDependencies": {
+    "@babel/cli": "^7.24.0",
+    "@babel/core": "^7.24.0",
+    "@babel/preset-env": "^7.24.0",
+    "@rollup/plugin-babel": "^7.1.0",
+    "esbuild": "^0.28.2",
+    "terser": "^5.26.0",
+    "vite": "^5.4.21"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }
