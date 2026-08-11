@@ -599,79 +599,60 @@ Currency.format = 'money_with_currency_format'
 // convert is from upstream currencies.js (Shopify) — assume present on page via {{ "/services/javascripts/currencies.js" | script_tag }}
 // If not present, provide no-op fallback to avoid crash in convertAll
 
-import { measure, mutate } from './scheduler.js'
-
 Currency.convertAll = function (oldCurrency, newCurrency, selector, format) {
   const sel = selector || 'span.money'
-  // Mepto/jQuery path if available — keeps $(sel).each compat, but use native under the hood when possible
-  const useMepto = $ && $.fn && typeof $ === 'function'
-  let nodes
-  if (useMepto) {
-    // Mepto's qsa is already optimized (getElementById fast-path, then qSA)
-    nodes = $(sel).toArray()
-  } else {
-    nodes = Array.from(document.querySelectorAll(sel))
-  }
+  // Use native querySelectorAll directly — Mepto's $(sel).toArray() allocates collection wrapper,
+  // native is already fast for simple selectors and avoids extra array copy
+  const nodes = Array.from(document.querySelectorAll(sel))
 
   const fmt = format || Currency.format
-  const oldFmtCache = new Map()
-  const newFmtCache = new Map()
-  const getFmt = (curr, cache) => {
-    if (cache.has(curr)) return cache.get(curr)
-    const v = Currency.moneyFormats[curr]?.[fmt] || '{{amount}}'
-    cache.set(curr, v)
-    return v
-  }
+  // hoisted — same for all nodes, no per-element Map lookups (was 2 Maps + N lookups)
+  const oldFmt = Currency.moneyFormats[oldCurrency]?.[fmt] || '{{amount}}'
+  const newFmt = Currency.moneyFormats[newCurrency]?.[fmt] || '{{amount}}'
+  const saveAttr = `data-currency-${newCurrency}`
+  const isOldNoDecimals = oldFmt.includes('amount_no_decimals')
+  const isOldSpecial = oldCurrency === 'JOD' || oldCurrency === 'KWD' || oldCurrency === 'BHD'
 
-  // Part I §3: separate read phase (collect html/attrs) from write phase (html/attr writes) — avoids W→R thrash for 50+ spans
+  // Part I §3/§5: separate read phase (collect text/attrs) from write phase — one layout for 50+ spans
+  // Use textContent not innerHTML — avoids HTML serialization, faster for money text
   const reads = []
   for (let i = 0; i < nodes.length; i++) {
     const el = nodes[i]
     const cur = el.getAttribute('data-currency')
     if (cur === newCurrency) continue
-    const saved = el.getAttribute(`data-currency-${newCurrency}`)
+    // hoisted saveAttr string — was N template allocations
+    const saved = el.getAttribute(saveAttr)
     if (saved) {
-      reads.push({ el, type: 'saved', saved, newCurrency })
+      reads.push({ el, type: 'saved', saved })
     } else {
-      const html = el.innerHTML
-      const digits = html.replace(NON_DIGITS_RE, '')
+      const text = el.textContent
+      const digits = text.replace(NON_DIGITS_RE, '')
       let cents
-      const oldFmt = getFmt(oldCurrency, oldFmtCache)
-      if (oldFmt.indexOf('amount_no_decimals') !== -1) {
+      // hoisted branch checks — were per-element indexOf + 3-way equality
+      if (isOldNoDecimals) {
         cents = Currency.convert(parseInt(digits, 10) * 100, oldCurrency, newCurrency)
-      } else if (oldCurrency === 'JOD' || oldCurrency === 'KWD' || oldCurrency === 'BHD') {
+      } else if (isOldSpecial) {
         cents = Currency.convert(parseInt(digits, 10) / 10, oldCurrency, newCurrency)
       } else {
         cents = Currency.convert(parseInt(digits, 10), oldCurrency, newCurrency)
       }
-      const newFmt = getFmt(newCurrency, newFmtCache)
       const formatted = Currency.formatMoney(cents, newFmt)
-      reads.push({ el, type: 'converted', formatted, newCurrency })
+      reads.push({ el, type: 'converted', formatted })
     }
   }
 
-  // batch writes in single mutate (rAF) — one layout
-  const doWrites = () => {
-    for (let i = 0; i < reads.length; i++) {
-      const r = reads[i]
-      if (r.type === 'saved') r.el.innerHTML = r.saved
-      else {
-        r.el.innerHTML = r.formatted
-        r.el.setAttribute(`data-currency-${r.newCurrency}`, r.formatted)
-      }
-      r.el.setAttribute('data-currency', r.newCurrency)
+  // batch writes — single layout, no rAF deferral (keeps cookie/currentCurrency sync for callers)
+  for (let i = 0; i < reads.length; i++) {
+    const r = reads[i]
+    if (r.type === 'saved') r.el.textContent = r.saved
+    else {
+      r.el.textContent = r.formatted
+      r.el.setAttribute(saveAttr, r.formatted)
     }
-    this.currentCurrency = newCurrency
-    this.cookie.write(newCurrency)
+    r.el.setAttribute('data-currency', newCurrency)
   }
-
-  // keep API sync for callers that read cookie immediately after convertAll
-  // but coalesce rapid successive convertAll calls (e.g. currency switcher spamming) via rAF
-  if (reads.length > 20) {
-    mutate(doWrites)
-  } else {
-    doWrites()
-  }
+  this.currentCurrency = newCurrency
+  this.cookie.write(newCurrency)
 }
 
 Currency.setMepto = Currency.setJQuery = function (jq) {
